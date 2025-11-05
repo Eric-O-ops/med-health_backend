@@ -14,15 +14,15 @@ class CustomUser(AbstractUser):
     # 1. ПЕРЕОПРЕДЕЛЕНИЕ: Делаем username необязательным
     username = models.CharField(
         max_length=150,
-        unique=False,
+        unique=True,
         null=True,
         blank=True
     )
 
-    first_name = models.CharField(max_length=120)
-    last_name = models.CharField(max_length=120)
-    email = models.EmailField(unique=True, null=False, blank=False)
-    password = models.CharField(max_length=128)
+    first_name = models.CharField(max_length=120, null=True, blank=True)
+    last_name = models.CharField(max_length=120, null=True, blank=True)
+    email = models.EmailField(unique=True, null=True, blank=True)
+    password_user = models.CharField(max_length=128, null=True, blank=True)
 
     # 2. Поле для логина
     USERNAME_FIELD = 'email'
@@ -79,6 +79,7 @@ class Requests(models.Model):
     id = models.AutoField(primary_key=True)
     first_name = models.CharField(max_length=120)
     last_name = models.CharField(max_length=120)
+    name_clinic = models.CharField(max_length=120)
     email = models.EmailField()
     phone_number = models.CharField(max_length=120)
     description = models.TextField()

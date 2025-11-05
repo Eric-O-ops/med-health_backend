@@ -1,5 +1,3 @@
-# serializers.py
-from rest_framework import serializers
 from .models import Requests, Manager
 from rest_framework import serializers
 from .models import (
@@ -9,8 +7,7 @@ from .models import (
 class RequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = Requests
-        fields = ('id', 'first_name', 'last_name', 'email', 'phone_number', 'description')
-
+        fields = ('id', 'first_name', 'last_name','name_clinic', 'email', 'phone_number', 'description')
 
 # --- Сериализаторы для связанных моделей (часто используются для вложенности) ---
 
@@ -22,13 +19,15 @@ class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = (
-            'id','first_name',
-                       'last_name',
+            'id',
+            'first_name',
+                'last_name',
                        'role',
                        'phone_number',
                        'date_of_birth',
                        'address',
                        'password',
+                        'password_user',
                         'email'
         )
         extra_kwargs = {
@@ -68,7 +67,7 @@ class ClinicOwnerNestedSerializer(serializers.ModelSerializer):
         # И email в **user_data (как именованный аргумент), что решает проблему.
         user = CustomUser.objects.create_user(
             email,
-            password=password,
+            password = password,
             **user_data  # <--- user_data все еще содержит 'email'
         )
 
