@@ -141,11 +141,73 @@ class Doctor(models.Model):
     experience_years = models.PositiveIntegerField()
     education = models.TextField()
 
+    specialization = models.CharField(
+        max_length=50,
+        choices=SPECIALIZATION_CHOICES,
+        default='other'  # Установите значение по умолчанию
+    )
+
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE)
 
     class Meta:
         db_table = 'doctors'
 
+class Patient(models.Model):
+    # Предполагаем, что CustomUser с ролью 'patient' будет иметь связанную модель Patient
+    id = models.AutoField(primary_key=True)
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'patients'
+
+class Appointment(models.Model):
+    id = models.AutoField(primary_key=True)
+
+    # Связь с CustomUser, который является пациентом
+    patient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='appointments')
+
+    # Связь с моделью Doctor
+    doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE, related_name='appointments')
+
+    # НОВЫЕ ПОЛЯ
+    symptomsDescribedByPatient = models.TextField(
+        verbose_name='Описанные пациентом симптомы',
+        blank=True,  # Разрешаем пустое значение в базе
+        default=''
+    )
+    selfTreatmentMethodsTaken = models.TextField(
+        verbose_name='Принятые методы самолечения',
+        blank=True,  # Разрешаем пустое значение в базе
+        default=''
+    )
+
+    APPOINTMENT_STATUS_CHOICES = (
+        ('scheduled', 'Запланирован'),
+        ('completed', 'Завершен'),
+        ('no_show', 'Не пришел'),  # <-- НОВЫЙ СТАТУС
+        ('cancelled', 'Отменен'),
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=APPOINTMENT_STATUS_CHOICES,
+        default='scheduled',
+        verbose_name='Статус приема'
+    )
+
+    # Дата и время записи
+    date = models.DateField()
+    time = models.TimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'appointments'
+        # Уникальность: один пациент может записаться к одному врачу на одно и то же время/дату только один раз
+        unique_together = ('doctor', 'date', 'time')
+        # Индекс для ускорения запросов по дате и доктору
+        indexes = [
+            models.Index(fields=['doctor', 'date']),
+        ]
 ###############################################################
 
 
