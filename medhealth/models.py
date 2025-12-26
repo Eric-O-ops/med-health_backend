@@ -96,10 +96,17 @@ class ClinicOwner(models.Model):
     class Meta:
         db_table = 'clinic_owners'
 
+
 class Branch(models.Model):
     id = models.AutoField(primary_key=True)
-    description = models.TextField()
     address = models.TextField()
+
+    # Это поле будем использовать для ПРАЗДНИКОВ (например: "8 Марта")
+    description = models.TextField(null=True, blank=True)
+
+    # Новые поля для настроек
+    working_hours = models.CharField(max_length=100, default="10:00 - 17:00")
+    off_days = models.CharField(max_length=100, default="Сб, Вс")
 
     clinic_owner = models.ForeignKey(ClinicOwner, on_delete=models.CASCADE)
 

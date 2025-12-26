@@ -79,8 +79,8 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'medhealth',       # Имя вашей БД
-        'USER': 'erikomaraliev',           # Имя пользователя PostgreSQL
-        'PASSWORD': '',   # Пароль пользователя
+        'USER': 'macpro',  # твой PostgreSQL пользователь
+        'PASSWORD': 'ПарольДляБД',        # Пароль пользователя
         'HOST': 'localhost',        # или IP-адрес сервера
         'PORT': '5432',             # Порт PostgreSQL (по умолчанию 5432)
     }

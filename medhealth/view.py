@@ -38,13 +38,38 @@ class ClinicOwnerViewSet(viewsets.ModelViewSet):
     queryset = ClinicOwner.objects.all()
     serializer_class = ClinicOwnerNestedSerializer
 
+
 class BranchViewSet(viewsets.ModelViewSet):
     queryset = Branch.objects.all()
     serializer_class = BranchSerializer
 
+    def get_queryset(self):
+        # Получаем базовый запрос
+        queryset = Branch.objects.all()
+
+        # Если это действие 'list' (получение списка), то фильтруем
+        if self.action == 'list':
+            owner_id = self.request.query_params.get('owner_id')
+            if owner_id and owner_id != 'null':
+                queryset = queryset.filter(clinic_owner_id=owner_id)
+            # Если owner_id нет, можно вернуть все или пустой список,
+            # но для админки лучше вернуть все.
+
+        # Для действий retrieve, update, destroy (удаление/редактирование)
+        # мы возвращаем queryset без жесткой фильтрации, чтобы Django нашел ID
+        return queryset
+
 class ManagerViewSet(viewsets.ModelViewSet):
     queryset = Manager.objects.all()
     serializer_class = ManagerSerializer
+
+    def get_queryset(self):
+        queryset = Manager.objects.all()
+        # Фильтруем менеджеров: берем тех, чьи филиалы принадлежат этому владельцу
+        owner_id = self.request.query_params.get('owner_id')
+        if owner_id:
+            queryset = queryset.filter(branch__clinic_owner_id=owner_id)
+        return queryset
 
 class DoctorViewSet(viewsets.ModelViewSet):
     queryset = Doctor.objects.all()
