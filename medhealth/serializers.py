@@ -116,11 +116,7 @@ class ManagerSerializer(serializers.ModelSerializer):
         return manager
 
 class BranchSerializer(serializers.ModelSerializer):
-    # 'managers' - это managers=Manager.objects.filter(branch=current_branch)
-    # Имя поля должно совпадать с related_name в модели Manager
     managers = ManagerSerializer(many=True, read_only=True)
-
-    # Для записи - ID владельца (как и было)
     clinic_owner = ClinicOwnerNestedSerializer(read_only=True)
     clinic_owner_id = serializers.PrimaryKeyRelatedField(
         queryset=ClinicOwner.objects.all(), source='clinic_owner', write_only=True
@@ -134,8 +130,18 @@ class BranchSerializer(serializers.ModelSerializer):
         )
 
 
+import json
+from rest_framework import serializers
+from .models import CustomUser, Doctor, Branch
+
+
 class DoctorSerializer(serializers.ModelSerializer):
-    user = CustomUserSerializer(read_only=True)
+    user = CustomUserSerializer()
+    # Тянем описание (праздники) из филиала
+    branch_description = serializers.CharField(source='branch.description', read_only=True)
+    education = serializers.CharField(required=False, allow_blank=True, default="Не указано")
+    experience_years = serializers.IntegerField(required=False, default=0)
+    description = serializers.CharField(required=False, allow_blank=True, default="Описание отсутствует")
 
     branch_id = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(), source='branch', write_only=True
@@ -144,8 +150,62 @@ class DoctorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Doctor
         fields = (
-            'id', 'user', 'first_name', 'last_name', 'description',
-            'experience_years', 'education', 'phone_number',
-            'branch', 'branch_id'
+            'id', 'user', 'specialization', 'price', 'gender', 'age',
+            'photo', 'education', 'experience_years', 'description',
+            'working_hours', 'off_days', 'branch', 'branch_id', 'branch_description'
         )
-        read_only_fields = ('branch',)
+        # Оставляем один четкий список
+        read_only_fields = ('branch', 'branch_description')
+
+    def to_internal_value(self, data):
+        """
+        Метод исправляет проблему Multipart: если 'user' пришел как строка (JSON),
+        мы превращаем его обратно в словарь для корректной валидации.
+        """
+        if isinstance(data.get('user'), str):
+            try:
+                mutable_data = data.copy()
+                mutable_data['user'] = json.loads(data['user'])
+                data = mutable_data
+            except ValueError:
+                pass
+        return super().to_internal_value(data)
+
+    def create(self, validated_data):
+        user_data = validated_data.pop('user')
+        branch_instance = validated_data.pop('branch')
+
+        password = user_data.pop('password')
+        email = user_data['email']
+
+        # Создаем пользователя с хешированным паролем + сохраняем открытый в password_user
+        user = CustomUser.objects.create_user(
+            email,
+            password=password,
+            password_user=password,
+            **user_data
+        )
+
+        education = validated_data.pop('education', 'Не указано')
+        experience_years = validated_data.pop('experience_years', 0)
+        description = validated_data.pop('description', 'Описание отсутствует')
+
+        doctor = Doctor.objects.create(
+            user=user,
+            branch=branch_instance,
+            education=education,
+            experience_years=experience_years,
+            description=description,
+            **validated_data
+        )
+        return doctor
+
+    def update(self, instance, validated_data):
+        # Если при обновлении профиля передаются данные юзера
+        user_data = validated_data.pop('user', None)
+        if user_data:
+            user_serializer = CustomUserSerializer(instance.user, data=user_data, partial=True)
+            if user_serializer.is_valid():
+                user_serializer.save()
+
+        return super().update(instance, validated_data)

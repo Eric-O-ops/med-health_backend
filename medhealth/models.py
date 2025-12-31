@@ -105,8 +105,8 @@ class Branch(models.Model):
     description = models.TextField(null=True, blank=True)
 
     # Новые поля для настроек
-    working_hours = models.CharField(max_length=100, default="10:00 - 17:00")
-    off_days = models.CharField(max_length=100, default="Сб, Вс")
+    working_hours = models.CharField(max_length=100, default="")
+    off_days = models.CharField(max_length=100, default="")
 
     clinic_owner = models.ForeignKey(ClinicOwner, on_delete=models.CASCADE)
 
@@ -129,26 +129,30 @@ class Manager(models.Model):
 
 
 class Doctor(models.Model):
-    SPECIALIZATION_CHOICES = (
-        ('therapist', 'Терапевт'),
-        ('surgeon', 'Хирург'),
-        ('pediatrician', 'Педиатр'),
-        ('cardiologist', 'Кардиолог'),
-        ('neurologist', 'Невролог'),
-        ('dentist', 'Стоматолог'),
-        ('ophthalmologist', 'Офтальмолог'),
-        ('dermatologist', 'Дерматолог'),
-        ('psychiatrist', 'Психиатр'),
-        ('other', 'Другое'),
+    GENDER_CHOICES = (
+        ('male', 'Мужской'),
+        ('female', 'Женский'),
     )
 
     id = models.AutoField(primary_key=True)
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
-    description = models.TextField()
-    experience_years = models.PositiveIntegerField()
-    education = models.TextField()
 
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE)
+    # Характеристики карточки
+    specialization = models.CharField(max_length=150, default="Терапевт")
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Цена приема
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, default='male')
+    age = models.PositiveIntegerField(default=25)
+    photo = models.ImageField(upload_to='doctors_photos/', null=True, blank=True)
+    # Профессиональные данные
+    education = models.TextField()
+    experience_years = models.PositiveIntegerField()
+    description = models.TextField()  # "О себе"
+
+    # График работы (по умолчанию как у филиала, но можно менять индивидуально)
+    working_hours = models.CharField(max_length=100, default="")
+    off_days = models.CharField(max_length=100, default="")
+
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='doctors')
 
     class Meta:
         db_table = 'doctors'

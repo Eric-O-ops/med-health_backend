@@ -71,12 +71,25 @@ class ManagerViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(branch__clinic_owner_id=owner_id)
         return queryset
 
+
 class DoctorViewSet(viewsets.ModelViewSet):
     queryset = Doctor.objects.all()
     serializer_class = DoctorSerializer
-    # Примечание: Для Doctor и Admin вам может потребоваться специальная
-    # логика создания, чтобы создать и CustomUser, и Doctor/Admin за одну операцию.
-    # Это делается через переопределение метода perform_create в ViewSet или
-    # через более сложную логику в Serializer.
 
+    def get_queryset(self):
+        """
+        Добавляем фильтрацию. Если в URL передан branch_id,
+        отдаем врачей только этого филиала.
+        """
+        queryset = Doctor.objects.all()
+        branch_id = self.request.query_params.get('branch_id')
 
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+
+        return queryset
+
+    def perform_destroy(self, instance):
+        user = instance.user
+        instance.delete()
+        user.delete()

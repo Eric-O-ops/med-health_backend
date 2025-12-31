@@ -1,19 +1,17 @@
-# app_name/urls.py
-
-# Импортируем только необходимые модули
+from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 
-# Импортируем представления для модели Requests (должны быть в .views)
-from .view import RequestListCreateView, RequestDetailView, ManagerViewSet
-
-# Импортируем ViewSet'ы для моделей пользователей/клиники
+# Импортируем представления из вашего файла view.py
 from .view import (
+    RequestListCreateView, RequestDetailView, ManagerViewSet,
     UserViewSet, AdminViewSet, ClinicOwnerViewSet,
     BranchViewSet, DoctorViewSet
 )
 
-# 1. Создаем роутер и регистрируем все ViewSet
+# 1. Настройка Роутера
 router = DefaultRouter()
 router.register('users', UserViewSet)
 router.register('admins', AdminViewSet)
@@ -23,17 +21,16 @@ router.register('doctors', DoctorViewSet)
 router.register('managers', ManagerViewSet)
 
 urlpatterns = [
-    # 2. Включаем все сгенерированные роутером URL-адреса
-    # Все новые маршруты будут доступны по корневому пути этого приложения (например, /api/users/)
+    path('admin/', admin.site.urls),
+
+    # Все ViewSet'ы будут доступны по адресу /api/...
     path('api/', include(router.urls)),
 
-    # 3. Маршруты для модели Requests (если она не использует ViewSet)
-    # GET/POST /api/requests/
-    path('requests/', RequestListCreateView.as_view(), name='request-list-create'),
-
-    # GET/PUT/PATCH/DELETE /api/requests/{pk}/
-    path('requests/<int:pk>/', RequestDetailView.as_view(), name='request-detail'),
+    # Маршруты для Requests
+    path('api/requests/', RequestListCreateView.as_view(), name='request-list-create'),
+    path('api/requests/<int:pk>/', RequestDetailView.as_view(), name='request-detail'),
 ]
 
-# Убедитесь, что вы удалили: path('api/', include('medhealth.urls')),
-# Это должно быть только в главном urls.py проекта!
+# 2. ПОДКЛЮЧЕНИЕ МЕДИА ФАЙЛОВ (Чтобы фото не были белыми)
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
