@@ -1,7 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
-
 class CustomUser(AbstractUser):
     ROLE_CHOICES = (
         ('owner', 'Владелец клиники'),
@@ -160,3 +159,27 @@ class Doctor(models.Model):
 ###############################################################
 
 
+class Appointment(models.Model):
+    STATUS_CHOICES = (
+        ('scheduled', 'Запланирован'),
+        ('completed', 'Завершен'),
+        ('no_show', 'Не пришел'),
+        ('cancelled', 'Отменен'),
+    )
+    id = models.AutoField(primary_key=True)
+    # Используем CustomUser, так как во Flutter Эрик передает patientId как ID пользователя
+    patient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='appointments')
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='appointments')
+
+    symptomsDescribedByPatient = models.TextField(blank=True, default='')
+    selfTreatmentMethodsTaken = models.TextField(blank=True, default='')
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled')
+    date = models.DateField()
+    time = models.TimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'appointments'
+        # Чтобы нельзя было записаться к одному врачу на одно и то же время дважды
+        unique_together = ('doctor', 'date', 'time')
