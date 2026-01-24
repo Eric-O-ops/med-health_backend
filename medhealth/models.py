@@ -97,10 +97,15 @@ class Appointment(models.Model):
     )
     id = models.AutoField(primary_key=True)
     patient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='appointments')
+
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='appointments')
+
     symptomsDescribedByPatient = models.TextField(blank=True, default='')
+
     selfTreatmentMethodsTaken = models.TextField(blank=True, default='')
+
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled')
+
     date = models.DateField()
     time = models.TimeField()
     created_at = models.DateTimeField(auto_now_add=True)
