@@ -1,7 +1,7 @@
 from .models import Requests, Manager
 from rest_framework import serializers
 from .models import (
-    CustomUser, Admin, ClinicOwner, Branch, Doctor
+    CustomUser, Admin, ClinicOwner, Branch, Doctor, Requests, Manager, Appointment
 )
 
 class RequestSerializer(serializers.ModelSerializer):
@@ -209,3 +209,31 @@ class DoctorSerializer(serializers.ModelSerializer):
                 user_serializer.save()
 
         return super().update(instance, validated_data)
+
+
+class AppointmentSlotSerializer(serializers.Serializer):
+        """Для отображения занятых/свободных слотов"""
+        date = serializers.DateField()
+        time = serializers.TimeField()
+        status = serializers.CharField()  # 'busy', 'mine'
+        patient_id = serializers.IntegerField(required=False, allow_null=True)
+        symptomsDescribedByPatient = serializers.CharField(required=False, allow_blank=True)
+        selfTreatmentMethodsTaken = serializers.CharField(required=False, allow_blank=True)
+
+class AppointmentRegisterSerializer(serializers.ModelSerializer):
+        """Для создания новой записи"""
+        # Мы принимаем ID из Flutter и превращаем их в объекты моделей
+        doctorId = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), source='doctor')
+        patientId = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all(), source='patient')
+
+        class Meta:
+            model = Appointment
+            fields = (
+                'doctorId', 'patientId', 'date', 'time',
+                'symptomsDescribedByPatient', 'selfTreatmentMethodsTaken'
+            ) #
+
+        def create(self, validated_data):
+            # Автоматически ставим статус 'scheduled' при регистрации
+            validated_data['status'] = 'scheduled'
+            return Appointment.objects.create(**validated_data)

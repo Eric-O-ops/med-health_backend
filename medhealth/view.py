@@ -8,11 +8,10 @@ from .models import (
     CustomUser, Admin, ClinicOwner, Branch,
     Doctor, Requests, Manager, Appointment
 )
-
-# Импорт твоих сериализаторов
 from .serializers import (
     CustomUserSerializer, AdminSerializer, ClinicOwnerNestedSerializer,
-    BranchSerializer, DoctorSerializer, RequestSerializer, ManagerSerializer
+    BranchSerializer, DoctorSerializer, RequestSerializer, ManagerSerializer,
+    AppointmentRegisterSerializer,
 )
 
 # --- Представления для Requests (Заявки) ---
@@ -107,20 +106,54 @@ class PatientAttendedView(APIView):
         except Appointment.DoesNotExist:
             return Response({'error': 'Not found'}, status=404)
 
+
 class AppointmentNoShowView(APIView):
+    """
+    POST /api/appointments/no-show-by-data/
+    Отмечает, что пациент не пришел.
+    """
+
     def post(self, request):
         d_id = request.data.get('doctorId')
         p_id = request.data.get('patientId')
         date = request.data.get('date')
         time_data = request.data.get('time')
-        time_obj = datetime.time(hour=time_data['hour'], minute=time_data['minute'])
+
+        # Превращаем данные времени из Flutter в объект времени Python
         try:
+            time_obj = datetime.time(hour=time_data['hour'], minute=time_data['minute'])
             app = Appointment.objects.get(doctor_id=d_id, patient_id=p_id, date=date, time=time_obj)
             app.status = 'no_show'
             app.save()
-            return Response({'status': 'ok'})
-        except Appointment.DoesNotExist:
-            return Response({'error': 'Not found'}, status=404)
+            return Response({'status': 'ok', 'message': 'Status updated to no_show'})
+        except (Appointment.DoesNotExist, TypeError, KeyError):
+            return Response({'error': 'Appointment not found or invalid data'}, status=404)
+
+class AppointmentSlotsView(APIView):
+    def post(self, request):
+        date_str = request.data.get('date')
+        doctor_id = request.data.get('doctorId')
+
+        if not date_str or not doctor_id:
+            return Response({"error": "Missing date or doctorId"}, status=400)
+
+        # Ищем все записи к этому врачу на этот день
+        occupied = Appointment.objects.filter(doctor_id=doctor_id, date=date_str)
+
+        data = []
+        for app in occupied:
+            data.append({
+                'date': app.date,
+                'time': app.time.strftime('%H:%M'),
+                'status': 'busy',  # Во Flutter это закрасит слот красным/серым
+                'patient_id': app.patient.id
+            })
+        return Response(data)
+
+
+class AppointmentRegisterView(generics.CreateAPIView):
+    queryset = Appointment.objects.all()
+    serializer_class = AppointmentRegisterSerializer
 
 # --- НОВЫЙ ЭНДПОИНТ ДЛЯ ПАЦИЕНТА (КЛИНИКИ) ---
 class AllClinicsListView(APIView):
