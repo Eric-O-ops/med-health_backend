@@ -8,8 +8,8 @@ from .view import (
     UserViewSet, AdminViewSet, ClinicOwnerViewSet,
     BranchViewSet, DoctorViewSet,
     DoctorDailyAppointmentsView, PatientAttendedView,
-    AppointmentNoShowView, AllClinicsListView, #Здесь горит красным AppointmentNoShowView
-    AppointmentSlotsView, AppointmentRegisterView # Добавлены новые
+    AppointmentNoShowView, AllClinicsListView,  # Здесь горит красным AppointmentNoShowView
+    AppointmentSlotsView, AppointmentRegisterView, AppointmentCancelView  # Добавлены новые
 )
 
 router = DefaultRouter()
@@ -34,6 +34,8 @@ urlpatterns = [
     path('api/doctors/appointments/daily/', DoctorDailyAppointmentsView.as_view()),
     path('api/appointments/patient-attended/', PatientAttendedView.as_view()),
     path('api/appointments/no-show-by-data/', AppointmentNoShowView.as_view()),
+    path('api/appointments/cancel/', AppointmentCancelView.as_view(), name='appointment-cancel'),  # <-- НОВЫЙ МАРШРУТ
+
 ]
 
 if settings.DEBUG:

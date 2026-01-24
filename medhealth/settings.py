@@ -78,9 +78,9 @@ WSGI_APPLICATION = 'medhealth.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'medhealth',       # Имя вашей БД
-        'USER': 'macpro',  # твой PostgreSQL пользователь
-        'PASSWORD': 'ПарольДляБД',        # Пароль пользователя
+        'NAME': 'medhealth_marlen',       # Имя вашей БД
+        'USER': 'erikomaraliev',  # твой PostgreSQL пользователь
+        'PASSWORD': '',        # Пароль пользователя
         'HOST': 'localhost',        # или IP-адрес сервера
         'PORT': '5432',             # Порт PostgreSQL (по умолчанию 5432)
     }

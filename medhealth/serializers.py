@@ -1,3 +1,7 @@
+from datetime import time, datetime
+
+from rest_framework.exceptions import ValidationError
+
 from .models import Requests, Manager
 from rest_framework import serializers
 from .models import (
@@ -212,28 +216,154 @@ class DoctorSerializer(serializers.ModelSerializer):
 
 
 class AppointmentSlotSerializer(serializers.Serializer):
-        """Для отображения занятых/свободных слотов"""
-        date = serializers.DateField()
-        time = serializers.TimeField()
-        status = serializers.CharField()  # 'busy', 'mine'
-        patient_id = serializers.IntegerField(required=False, allow_null=True)
-        symptomsDescribedByPatient = serializers.CharField(required=False, allow_blank=True)
-        selfTreatmentMethodsTaken = serializers.CharField(required=False, allow_blank=True)
+    """Сериализатор для отображения слотов приема."""
+    # Имя поля busyStatus совпадает с требуемым в ответе
+    busyStatus = serializers.CharField(source='status')
 
-class AppointmentRegisterSerializer(serializers.ModelSerializer):
-        """Для создания новой записи"""
-        # Мы принимаем ID из Flutter и превращаем их в объекты моделей
-        doctorId = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), source='doctor')
-        patientId = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all(), source='patient')
+    # Используем SerializerMethodField для форматирования datetime
+    dateTime = serializers.SerializerMethodField()
 
-        class Meta:
-            model = Appointment
-            fields = (
-                'doctorId', 'patientId', 'date', 'time',
-                'symptomsDescribedByPatient', 'selfTreatmentMethodsTaken'
-            ) #
+    # НОВОЕ ПОЛЕ: ID пациента. Если слот не занят, это будет null.
+    patientId = serializers.IntegerField(source='patient_id', allow_null=True)  # <-- ДОБАВЛЕНО
+    symptomsDescribedByPatient = serializers.CharField(
+        allow_blank=True,
+        required=False
+    )
+    selfTreatmentMethodsTaken = serializers.CharField(
+        allow_blank=True,
+        required=False
+    )
 
-        def create(self, validated_data):
-            # Автоматически ставим статус 'scheduled' при регистрации
-            validated_data['status'] = 'scheduled'
-            return Appointment.objects.create(**validated_data)
+    def get_dateTime(self, obj):
+        """Форматирует дату и время в строку ISO 8601 с 'Z'."""
+        combined_dt = datetime.combine(obj.date, obj.time)
+        return combined_dt.isoformat() + 'Z'
+
+
+class AppointmentCancelSerializer(serializers.Serializer):
+    """Сериализатор для отмены записи. Требует patientId, doctorId, date и time."""
+
+    # Используем IntegerField для ID, так как нам нужно только значение
+    patientId = serializers.IntegerField()
+    doctorId = serializers.IntegerField()
+    date = serializers.DateField()
+    time = serializers.DictField(child=serializers.IntegerField(min_value=0))
+
+    def validate_time(self, value):
+        """Проверяет и конвертирует dict {'hour': h, 'minute': m} в объект time."""
+        try:
+            hour = value['hour']
+            minute = value['minute']
+        except KeyError:
+            raise ValidationError("Поля 'hour' и 'minute' обязательны в объекте 'time'.")
+
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValidationError("Некорректное значение для часа (0-23) или минуты (0-59).")
+
+        return time(hour, minute)
+
+    def cancel_appointment(self):
+        """Находит и удаляет запись."""
+        validated_data = self.validated_data
+
+        # Проверяем существование пациента и доктора для чистоты кода
+        if not CustomUser.objects.filter(id=validated_data['patientId']).exists():
+            raise ValidationError({"patientId": "Пациент с данным ID не найден."})
+        if not Doctor.objects.filter(id=validated_data['doctorId']).exists():
+            raise ValidationError({"doctorId": "Доктор с данным ID не найден."})
+
+        # Фильтруем по всем параметрам, чтобы найти ТОЧНО ОДНУ запись
+        deleted_count, _ = Appointment.objects.filter(
+            patient_id=validated_data['patientId'],
+            doctor_id=validated_data['doctorId'],
+            date=validated_data['date'],
+            time=validated_data['time']
+        ).delete()
+
+        return deleted_count
+
+class AppointmentRegisterSerializer(serializers.Serializer):
+    """
+    Сериализатор для POST-запроса регистрации на прием, принимает patientId.
+    """
+    doctorId = serializers.PrimaryKeyRelatedField(
+        queryset=Doctor.objects.all(), source='doctor'
+    )
+    # НОВОЕ ПОЛЕ: patientId, автоматически проверяет, что это CustomUser с ролью 'patient'
+    patientId = serializers.PrimaryKeyRelatedField(
+        # Важно: фильтруем только пользователей с ролью 'patient'
+        queryset=CustomUser.objects.filter(role='patient'),
+        source='patient'
+    )
+    date = serializers.DateField()
+    time = serializers.DictField(
+        child=serializers.IntegerField(min_value=0)
+    )
+
+    # НОВЫЕ ПОЛЯ
+    symptomsDescribedByPatient = serializers.CharField(
+        max_length=500,  # Укажите подходящий max_length
+        required=False,  # Оставляем их необязательными, как в модели
+        allow_blank=True
+    )
+    selfTreatmentMethodsTaken = serializers.CharField(
+        max_length=500,  # Укажите подходящий max_length
+        required=False,
+        allow_blank=True
+    )
+
+    def validate_time(self, value):
+        """Проверяет, что поля 'hour' и 'minute' присутствуют и корректны."""
+        try:
+            hour = value['hour']
+            minute = value['minute']
+        except KeyError:
+            raise ValidationError("Поля 'hour' и 'minute' обязательны в объекте 'time'.")
+
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValidationError("Некорректное значение для часа (0-23) или минуты (0-59).")
+
+        return time(hour, minute)
+
+    def validate(self, data):
+        """Проверяет, что запись на это время уже не существует."""
+        doctor = data['doctor']
+        date = data['date']
+        time_obj = data['time']  # Объект time
+
+        # patient = data['patient'] - объект CustomUser уже присутствует в данных
+
+        # Проверка, существует ли уже запись
+        if Appointment.objects.filter(
+                doctor=doctor, date=date, time=time_obj
+        ).exists():
+            raise ValidationError(
+                f"Время {time_obj.strftime('%H:%M')} на {date.strftime('%Y-%m-%d')} у этого доктора уже занято."
+            )
+
+        # Удалена проверка request.user.is_authenticated и request.user.role
+
+        return data
+
+    def create(self, validated_data):
+        # Извлекаем данные, включая новые поля
+        doctor = validated_data['doctor']
+        date = validated_data['date']
+        time_obj = validated_data['time']
+        patient = validated_data['patient']
+
+        # Получаем новые поля, используя .pop() для удаления из validated_data
+        symptoms = validated_data.pop('symptomsDescribedByPatient', '')
+        self_treatment = validated_data.pop('selfTreatmentMethodsTaken', '')
+
+        # Создаем запись, передавая новые поля
+        appointment = Appointment.objects.create(
+            patient=patient,
+            doctor=doctor,
+            date=date,
+            time=time_obj,
+            symptomsDescribedByPatient=symptoms,  # <-- СОХРАНЯЕМ
+            selfTreatmentMethodsTaken=self_treatment  # <-- СОХРАНЯЕМ
+        )
+
+        return appointment
